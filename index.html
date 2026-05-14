@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FFINV Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#080810;--black2:#0D0D18;--black3:#13132A;--black4:#1A1A35;
+  --border:#1E2040;--border2:#2A2D55;
+  --red:#E63946;--red2:#FF6B6B;--red-dim:rgba(230,57,70,0.12);--red-dim2:rgba(230,57,70,0.06);
+  --blue:#1D4ED8;--blue2:#3B82F6;--blue3:#60A5FA;--blue-dim:rgba(59,130,246,0.12);--blue-dim2:rgba(29,78,216,0.06);
+  --white:#FFFFFF;--white2:#E8EAF0;--white3:#9CA3B8;--white4:#4A506A;
+  --green:#10B981;--green-dim:rgba(16,185,129,0.12);
+  --amber:#F59E0B;--amber-dim:rgba(245,158,11,0.1);
+  --star:#F8FAFF;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--black);color:var(--white2);font-family:'Outfit',sans-serif;min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;}
+
+/* Stars background */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(29,78,216,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(230,57,70,0.06) 0%,transparent 50%);pointer-events:none;z-index:0;}
+
+.loading-screen{position:fixed;inset:0;background:var(--black);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px;}
+.loading-mark{font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:6px;line-height:1;background:linear-gradient(135deg,var(--red),var(--white),var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.loading-sub{font-size:11px;color:var(--white4);letter-spacing:4px;text-transform:uppercase;font-family:'DM Mono',monospace;}
+.spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--blue2);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+header{background:var(--black2);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);}
+.logo{display:flex;align-items:center;gap:14px;}
+.logo-flag{display:flex;flex-direction:column;gap:2px;width:28px;}
+.flag-stripe{height:4px;border-radius:2px;}
+.flag-stripe.r{background:var(--red);}
+.flag-stripe.w{background:var(--white);}
+.flag-stripe.b{background:var(--blue2);}
+.logo-text h1{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--white);line-height:1;}
+.logo-text small{font-family:'DM Mono',monospace;font-size:8px;color:var(--blue3);letter-spacing:3px;text-transform:uppercase;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.sync-pill{display:flex;align-items:center;gap:6px;background:var(--black3);border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite;}
+.sync-dot.offline{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+.month-nav{display:flex;align-items:center;background:var(--black3);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.month-btn{background:none;border:none;color:var(--blue3);font-size:16px;cursor:pointer;padding:6px 10px;font-weight:700;transition:background .15s;}
+.month-btn:hover{background:var(--blue-dim);}
+.month-label{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;color:var(--white);min-width:80px;text-align:center;}
+
+.container{max-width:1200px;margin:0 auto;padding:18px 14px;position:relative;z-index:1;}
+
+/* KPI Strip */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;}
+@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:560px){.kpi-strip{grid-template-columns:repeat(2,1fr);}}
+.kpi{background:var(--black2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;position:relative;overflow:hidden;transition:border-color .2s;}
+.kpi:hover{border-color:var(--border2);}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi-accent.red{background:linear-gradient(90deg,var(--red),var(--red2));}
+.kpi-accent.blue{background:linear-gradient(90deg,var(--blue),var(--blue2));}
+.kpi-accent.white{background:linear-gradient(90deg,var(--white3),var(--white));}
+.kpi-accent.green{background:var(--green);}
+.kpi-accent.amber{background:var(--amber);}
+.kpi-label{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--white4);margin-bottom:6px;margin-top:4px;}
+.kpi-value{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;line-height:1;color:var(--white);}
+.kpi-value.pos{color:var(--green);}
+.kpi-value.neg{color:var(--red);}
+.kpi-value.blue{color:var(--blue3);}
+.kpi-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);margin-top:3px;}
+
+/* Net box */
+.net-box{border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border:1px solid var(--border);}
+.net-box.profit{background:linear-gradient(135deg,#050f0a,#081810);border-color:rgba(16,185,129,0.25);}
+.net-box.loss{background:linear-gradient(135deg,#150508,#200810);border-color:rgba(230,57,70,0.25);}
+.net-box.even{background:linear-gradient(135deg,#070818,#0d1025);border-color:rgba(59,130,246,0.25);}
+.net-label{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:2px;opacity:.6;margin-bottom:4px;}
+.net-amount{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;line-height:1;}
+.net-box.profit .net-amount{color:var(--green);}
+.net-box.loss .net-amount{color:var(--red);}
+.net-box.even .net-amount{color:var(--blue3);}
+.net-sub{font-size:11px;color:var(--white4);margin-top:4px;font-family:'DM Mono',monospace;}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;margin-bottom:14px;background:var(--black2);border:1px solid var(--border);border-radius:10px;padding:4px;overflow-x:auto;}
+.tab{flex:1;min-width:70px;padding:8px 6px;text-align:center;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;border-radius:7px;cursor:pointer;color:var(--white4);transition:all .2s;border:none;background:transparent;white-space:nowrap;letter-spacing:.3px;}
+.tab.active{background:linear-gradient(135deg,var(--red),#c1121f);color:var(--white);font-weight:700;}
+.tab:hover:not(.active){color:var(--white2);background:var(--black3);}
+
+/* Cards */
+.card{background:var(--black2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+.card-header{background:var(--black3);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--blue3);}
+.card-body{padding:14px 16px;}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;color:var(--red2);margin-bottom:10px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Forms */
+.form-row{display:grid;gap:10px;margin-bottom:10px;}
+.fr2{grid-template-columns:1fr 1fr;}
+.fr3{grid-template-columns:1fr 1fr 1fr;}
+.fr4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.fr5{grid-template-columns:1fr 1fr 1fr 1fr 1fr;}
+@media(max-width:640px){.fr3,.fr4,.fr5{grid-template-columns:1fr 1fr;}}
+@media(max-width:400px){.form-row{grid-template-columns:1fr;}}
+.field label{display:block;font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--white4);margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;background:var(--black3);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.field input:focus,.field select:focus{border-color:var(--blue2);}
+.field select option{background:var(--black3);}
+
+/* Buttons */
+.btn{padding:9px 18px;border-radius:8px;border:none;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.btn-primary{background:linear-gradient(135deg,var(--red),#c1121f);color:var(--white);width:100%;margin-top:4px;}
+.btn-primary:hover{opacity:.9;}
+.btn-blue{background:linear-gradient(135deg,var(--blue),var(--blue2));color:var(--white);width:100%;margin-top:4px;}
+.btn-sm{padding:5px 10px;font-size:10px;background:transparent;color:var(--white4);border:1px solid var(--border);border-radius:6px;cursor:pointer;}
+.btn-sm:hover{border-color:var(--border2);color:var(--white2);}
+.btn-danger{color:var(--red);border-color:rgba(230,57,70,0.3);}
+.btn-danger:hover{background:var(--red-dim);border-color:var(--red);}
+.btn-save{color:var(--green);border-color:rgba(16,185,129,0.3);}
+.btn-export{color:var(--blue3);border-color:rgba(59,130,246,0.3);}
+
+/* Tables */
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:1.5px;color:var(--white4);border-bottom:1px solid var(--border);white-space:nowrap;}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover td{background:var(--black3);}
+.scroll-x{overflow-x:auto;}
+
+/* Badges */
+.prop-badge{display:inline-flex;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px;background:var(--blue-dim);border:1px solid rgba(59,130,246,0.3);color:var(--blue3);}
+.status-badge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;}
+.status-badge.active{background:var(--green-dim);color:var(--green);}
+.status-badge.vacant{background:var(--red-dim);color:var(--red2);}
+.status-badge.flip{background:var(--amber-dim);color:var(--amber);}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-family:'DM Mono',monospace;}
+.tag.pos{background:var(--green-dim);color:var(--green);}
+.tag.neg{background:var(--red-dim);color:var(--red2);}
+.tag.blue{background:var(--blue-dim);color:var(--blue3);}
+
+/* Property cards */
+.prop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.prop-card{background:var(--black2);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s;}
+.prop-card:hover{border-color:var(--border2);}
+.prop-card-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.prop-card-body{padding:12px 14px;}
+.prop-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--blue-dim);border:1px solid rgba(59,130,246,0.2);}
+.stat-mini{background:var(--black3);border-radius:8px;padding:10px;text-align:center;}
+.stat-mini-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+.stat-mini-value{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;line-height:1;}
+
+/* P&L rows */
+.pl-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.pl-row:last-child{border-bottom:none;}
+.pl-label{color:var(--white3);}
+.pl-val{font-family:'DM Mono',monospace;font-weight:500;}
+.pl-total{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;margin-top:10px;border-radius:8px;font-weight:700;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;}
+.pl-total.profit{background:var(--green-dim);color:var(--green);}
+.pl-total.loss{background:var(--red-dim);color:var(--red2);}
+.pl-divider{height:1px;background:var(--border);margin:8px 0;}
+
+/* Fixed inputs */
+.fixed-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px;}
+.fixed-row:last-child{border-bottom:none;}
+.fixed-label{color:var(--white3);font-size:13px;flex:1;}
+.fixed-input{width:140px;padding:7px 11px;background:var(--black3);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;text-align:right;outline:none;transition:border-color .2s;}
+.fixed-input:focus{border-color:var(--blue2);}
+.fixed-input-sym{color:var(--white4);font-size:12px;font-family:'DM Mono',monospace;}
+.fixed-input-wrap{display:flex;align-items:center;gap:5px;}
+
+/* Progress */
+.progress-wrap{margin:6px 0;}
+.progress-labels{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);margin-bottom:4px;}
+.progress-track{height:5px;background:var(--black4);border-radius:99px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:99px;transition:width .6s ease;}
+.progress-fill.pos{background:linear-gradient(90deg,var(--green),#34d399);}
+.progress-fill.neg{background:linear-gradient(90deg,var(--red),var(--red2));}
+.progress-fill.blue{background:linear-gradient(90deg,var(--blue),var(--blue2));}
+
+/* Debt cards */
+.debt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
+.debt-card{background:var(--black2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.debt-label{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--white4);margin-bottom:4px;}
+.debt-value{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;}
+.equity-hero{background:linear-gradient(135deg,var(--blue-dim2),var(--red-dim2));border:1px solid var(--border2);border-radius:12px;padding:20px;text-align:center;margin-bottom:12px;}
+.equity-amt{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;color:var(--white);line-height:1;}
+.equity-lbl{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:3px;color:var(--white4);margin-bottom:8px;}
+
+/* History */
+.month-hist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;}
+.month-hist-card{background:var(--black3);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.month-hist-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+.month-hist-val{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;}
+
+/* Empty */
+.empty{text-align:center;padding:28px 16px;color:var(--white4);}
+.empty-icon{font-size:28px;margin-bottom:8px;}
+.empty-text{font-size:12px;font-family:'DM Mono',monospace;}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--black2);border:1px solid var(--blue2);color:var(--blue3);padding:10px 20px;border-radius:8px;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:14px;z-index:9999;animation:toastIn .3s ease;pointer-events:none;}
+@keyframes toastIn{from{opacity:0;}to{opacity:1;}}
+
+/* Entity rows */
+.entity-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px;}
+.entity-row:last-child{border-bottom:none;}
+
+@media(max-width:480px){.hide-mobile{display:none;}}
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-mark">FFINV TRACKER</div>
+  <div class="spinner"></div>
+  <div class="loading-sub">Connecting to database...</div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-flag">
+      <div class="flag-stripe r"></div>
+      <div class="flag-stripe w"></div>
+      <div class="flag-stripe b"></div>
+    </div>
+    <div class="logo-text">
+      <h1>FFINV TRACKER</h1>
+      <small>Family First Investments</small>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="sync-pill">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Live</span>
+    </div>
+    <div class="month-nav">
+      <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button class="month-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="kpi-strip" id="kpiStrip"></div>
+  <div id="netBox"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('monthly')">📋 Monthly</button>
+    <button class="tab" onclick="showTab('properties')">🏠 Properties</button>
+    <button class="tab" onclick="showTab('flips')">🔨 Flips</button>
+    <button class="tab" onclick="showTab('debt')">💳 Debt</button>
+    <button class="tab" onclick="showTab('history')">📈 History</button>
+    <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
+  </div>
+
+  <!-- MONTHLY TAB -->
+  <div id="tab-monthly">
+    <div class="section-title">Log Monthly Entry</div>
+    <div class="card"><div class="card-body">
+      <div class="form-row fr3">
+        <div class="field"><label>Property</label><select id="entryProp" onchange="autoFillFixed()"></select></div>
+        <div class="field"><label>Tenant / Guest Name</label><input type="text" id="entryGuest" placeholder="Optional"/></div>
+        <div class="field"><label>Status</label>
+          <select id="entryStatus">
+            <option value="rented">Rented</option>
+            <option value="vacant">Vacant</option>
+            <option value="flip">Flip / Under Reno</option>
+          </select>
+        </div>
+      </div>
+      <!-- Dates row — always shown, month derived automatically -->
+      <div class="form-row fr4">
+        <div class="field"><label>Check-In Date</label><input type="date" id="entryCheckin" oninput="calcEntryNights()"/></div>
+        <div class="field"><label>Check-Out Date</label><input type="date" id="entryCheckout" oninput="calcEntryNights()"/></div>
+        <div class="field"><label>Nights (auto-calc)</label><input type="number" id="entryNights" placeholder="0" readonly style="background:var(--black4);color:var(--blue3);font-weight:700;" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Months Covered</label><input type="text" id="entryMonthsDisplay" placeholder="auto" readonly style="background:var(--black4);color:var(--blue3);font-size:11px;"/></div>
+      </div>
+      <div class="section-title" style="font-size:11px;margin-top:4px;">Revenue</div>
+      <div class="form-row fr4">
+        <div class="field"><label>Gross Rent ($)</label><input type="number" id="entryGrossRent" placeholder="0.00" step="0.01" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Platform %</label><input type="number" id="entryPlatformPct" placeholder="0" step="0.1" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Mgmt Fee ($)</label><input type="number" id="entryMgmt" placeholder="0.00" step="0.01" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Mgmt % of Rent</label><input type="number" id="entryMgmtPct" placeholder="0" step="0.1" oninput="updateEntryCalcs()"/></div>
+      </div>
+      <!-- Live calc bar -->
+      <div style="background:var(--black3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap;">
+        <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Avg / Night</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--blue3);" id="calcPerNight">—</div></div>
+        <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Platform Fee</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--red2);" id="calcPlatformFee">—</div></div>
+        <div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mgmt Fee</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--red2);" id="calcMgmtFee">—</div></div>
+      </div>
+      <div class="section-title" style="font-size:11px;">Fixed Expenses <span style="font-size:9px;color:var(--white4);font-family:DM Mono,monospace;font-weight:400;letter-spacing:0;">(auto-filled from property settings)</span></div>
+      <div class="form-row fr3">
+        <div class="field"><label>Mortgage ($)</label><input type="number" id="entryMortgage" placeholder="0.00" step="0.01" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Insurance ($)</label><input type="number" id="entryInsurance" placeholder="0.00" step="0.01" oninput="updateEntryCalcs()"/></div>
+        <div class="field"><label>Internet ($)</label><input type="number" id="entryInternet" placeholder="0.00" step="0.01" oninput="updateEntryCalcs()"/></div>
+      </div>
+      <div class="field" style="margin-bottom:10px;"><label>Notes</label><input type="text" id="entryNotes" placeholder="Optional"/></div>
+      <!-- Live P&L preview -->
+      <div id="entryPreview" style="display:none;background:var(--black3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+          <div class="stat-mini"><div class="stat-mini-label">Gross Rent</div><div class="stat-mini-value" style="color:var(--green);" id="previewRev">$0</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Fixed Exp</div><div class="stat-mini-value" style="color:var(--red2);" id="previewFixed">$0</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Mgmt + Platform</div><div class="stat-mini-value" style="color:var(--red2);" id="previewVar">$0</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Net Profit</div><div class="stat-mini-value" id="previewNet">$0</div></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addEntry()" id="addEntryBtn">+ Log Entry</button>
+    </div></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="section-title" style="margin-bottom:0;flex:1">Entry History</div>
+      <button class="btn btn-sm btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <select id="filterProp" style="padding:5px 10px;background:var(--black3);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:11px;outline:none;" onchange="renderEntries()"><option value="">All Properties</option></select>
+    </div>
+    <div class="card"><div class="scroll-x">
+      <table class="tbl">
+        <thead><tr>
+          <th>Check-In</th><th>Check-Out</th><th>Property</th><th>Status</th>
+          <th>Gross Rent</th><th>Nights</th><th>Fixed Exp</th><th>Var Exp</th><th>Net Profit</th><th>$/Night</th><th></th>
+        </tr></thead>
+        <tbody id="entryBody"></tbody>
+      </table>
+    </div></div>
+
+    <!-- STANDALONE VARIABLE EXPENSES BOX -->
+    <div class="section-title" style="margin-top:14px;">Variable Expenses</div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Add Expense</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:DM Mono,monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;">Property:</span>
+          <select id="varExpProp" style="padding:4px 8px;background:var(--black4);border:1px solid var(--border2);border-radius:6px;color:var(--white);font-size:11px;outline:none;" onchange="renderVarExpLog()"></select>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px;">
+          <div class="field" style="margin-bottom:0;"><label>Description</label><input type="text" id="varExpDesc" placeholder="Electric, Cleaning, Repair..."/></div>
+          <div class="field" style="margin-bottom:0;"><label>Amount ($)</label><input type="number" id="varExpAmt" placeholder="0.00" step="0.01"/></div>
+          <div class="field" style="margin-bottom:0;"><label>Category</label>
+            <select id="varExpCat">
+              <option>Electric</option><option>Trash / Water</option><option>Cleaning</option>
+              <option>Repair / Maintenance</option><option>Supplies</option><option>HOA</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0;"><label>Date</label><input type="date" id="varExpDate"/></div>
+          <button class="btn btn-sm" style="color:var(--green);border-color:rgba(16,185,129,0.3);padding:9px 14px;" onclick="addStandaloneVarExp()">+ Add</button>
+        </div>
+        <!-- Property tabs -->
+        <div id="varExpPropTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
+        <!-- Log -->
+        <div id="varExpLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROPERTIES TAB -->
+  <div id="tab-properties" style="display:none">
+    <div class="section-title">Portfolio Overview</div>
+    <div class="prop-grid" id="propCards"></div>
+
+    <div class="section-title" style="margin-top:4px;">Add Property</div>
+    <div class="card"><div class="card-body">
+      <div class="form-row fr4">
+        <div class="field"><label>Property Name</label><input type="text" id="newPropName" placeholder="e.g. Kirkwood"/></div>
+        <div class="field"><label>Address</label><input type="text" id="newPropAddr" placeholder="123 Main St"/></div>
+        <div class="field"><label>Type</label>
+          <select id="newPropType">
+            <option value="str">Short-Term Rental (STR)</option>
+            <option value="ltr">Long-Term Rental (LTR)</option>
+            <option value="flip">Flip</option>
+          </select>
+        </div>
+        <div class="field"><label>ARV ($)</label><input type="number" id="newPropARV" placeholder="0"/></div>
+      </div>
+      <div class="form-row fr4">
+        <div class="field"><label>Mortgage ($/mo)</label><input type="number" id="newPropMortgage" placeholder="0.00" step="0.01"/></div>
+        <div class="field"><label>Insurance ($/mo)</label><input type="number" id="newPropInsurance" placeholder="0.00" step="0.01"/></div>
+        <div class="field"><label>Internet ($/mo)</label><input type="number" id="newPropInternet" placeholder="0.00" step="0.01"/></div>
+        <div class="field"><label>Mgmt Co Name (AZ)</label><input type="text" id="newPropMgmtName" placeholder="e.g. Vacasa"/></div>
+      </div>
+      <button class="btn btn-blue" onclick="addProperty()">+ Add Property</button>
+    </div></div>
+  </div>
+
+  <!-- DEBT TAB -->
+  <div id="tab-debt" style="display:none">
+    <div id="equityHero"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div>
+        <div class="section-title">Mortgages</div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Property Loans</span><button class="btn btn-sm btn-save" onclick="saveMortgages()">💾 Save</button></div>
+          <div class="card-body" id="mortgageInputs"></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Credit Cards</div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Cards</span><button class="btn btn-sm btn-save" onclick="saveCards()">💾 Save</button></div>
+          <div class="card-body">
+            <div class="form-row fr3" style="margin-bottom:6px;">
+              <div class="field"><label>Card Name</label><input type="text" id="newCardName" placeholder="Chase Ink"/></div>
+              <div class="field"><label>Limit ($)</label><input type="number" id="newCardLimit" placeholder="20000"/></div>
+              <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-blue" style="margin-top:0;" onclick="addCard()">+ Add</button></div>
+            </div>
+            <div id="cardList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section-title">Debt Summary</div>
+    <div class="debt-grid" id="debtSummary"></div>
+  </div>
+
+
+  <!-- FLIPS TAB -->
+  <div id="tab-flips" style="display:none">
+    <div class="section-title">Active Flips</div>
+    <div id="flipCards"></div>
+
+    <div class="section-title" style="margin-top:4px;">Add New Flip</div>
+    <div class="card"><div class="card-body">
+      <div class="form-row fr4">
+        <div class="field"><label>Property Name</label><input type="text" id="flipName" placeholder="e.g. Kirkwood Flip"/></div>
+        <div class="field"><label>Address</label><input type="text" id="flipAddr" placeholder="123 Main St"/></div>
+        <div class="field"><label>Purchase Price ($)</label><input type="number" id="flipPurchase" placeholder="0" step="0.01"/></div>
+        <div class="field"><label>ARV Estimate ($)</label><input type="number" id="flipARV" placeholder="0" step="1000"/></div>
+      </div>
+      <div class="form-row fr4">
+        <div class="field"><label>Total Rehab Budget ($)</label><input type="number" id="flipBudget" placeholder="0" step="0.01"/></div>
+        <div class="field"><label>Start Date</label><input type="date" id="flipStart"/></div>
+        <div class="field"><label>Target Completion</label><input type="date" id="flipTarget"/></div>
+        <div class="field"><label>Status</label>
+          <select id="flipStatus">
+            <option value="planning">Planning</option>
+            <option value="active">In Progress</option>
+            <option value="complete">Complete</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+      </div>
+      <div class="section-title" style="font-size:11px;">Kiavi Loan</div>
+      <div class="form-row fr4">
+        <div class="field"><label>Loan Amount ($)</label><input type="number" id="flipLoanAmt" placeholder="0" step="0.01"/></div>
+        <div class="field"><label>Interest Rate (%)</label><input type="number" id="flipRate" placeholder="10.5" step="0.1"/></div>
+        <div class="field"><label>Loan Term (months)</label><input type="number" id="flipTerm" placeholder="12" min="1" max="24"/></div>
+        <div class="field"><label>Draw #1 Amount ($)</label><input type="number" id="flipDraw1" placeholder="0" step="0.01"/></div>
+      </div>
+      <button class="btn btn-primary" onclick="addFlip()">+ Add Flip</button>
+    </div></div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" style="display:none">
+    <div class="section-title">Portfolio Revenue by Month</div>
+    <div class="card"><div class="card-body" id="revenueChart"></div></div>
+    <div class="section-title">Monthly Snapshots</div>
+    <div class="month-hist-grid" id="monthHistGrid"></div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" style="display:none">
+    <div class="section-title">Properties</div>
+    <div class="card"><div class="card-body" id="propList"></div></div>
+    <div class="section-title">Data</div>
+    <div class="card"><div class="card-body">
+      <p style="font-size:12px;color:var(--white4);margin-bottom:12px;font-family:'DM Mono',monospace;">All data syncs in real time across devices via Firebase.</p>
+      <button class="btn btn-sm btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    </div></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCtDVqsEZ2nuphxB1ahXbKba-mTjgBkSu4",
+  authDomain: "ffinv-tracker.firebaseapp.com",
+  databaseURL: "https://ffinv-tracker-default-rtdb.firebaseio.com",
+  projectId: "ffinv-tracker",
+  storageBucket: "ffinv-tracker.firebasestorage.app",
+  messagingSenderId: "892582738166",
+  appId: "1:892582738166:web:a86d5d681f248dcfc854d7",
+  measurementId: "G-7F5FHKM3HX"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let cYear=new Date().getFullYear(), cMonth=new Date().getMonth();
+function monthKey(){ return `${cYear}-${String(cMonth+1).padStart(2,'0')}`; }
+function monthLabel(){ return `${MONTHS[cMonth]} ${cYear}`; }
+
+window.changeMonth=function(dir){
+  cMonth+=dir;
+  if(cMonth>11){cMonth=0;cYear++;}
+  if(cMonth<0){cMonth=11;cYear--;}
+  document.getElementById('monthLabel').textContent=monthLabel();
+  unsubscribeListeners();
+  setupListeners();
+};
+
+let entries={}, properties={}, mortgages={}, cards={}, allData={}, flips={}, leases={}, varExps={};
+let unsubs=[];
+
+function unsubscribeListeners(){unsubs.forEach(u=>u());unsubs=[];}
+
+function setSyncDot(state){
+  const d=document.getElementById('syncDot'),l=document.getElementById('syncLabel');
+  d.className=`sync-dot${state==='syncing'?' syncing':state==='offline'?' offline':''}`;
+  l.textContent=state==='syncing'?'Sync...':state==='offline'?'Offline':'Live';
+}
+
+function fbSet(path,data){setSyncDot('syncing');return set(ref(db,path),data).then(()=>setSyncDot('online')).catch(()=>setSyncDot('offline'));}
+function fbRemove(path){setSyncDot('syncing');return remove(ref(db,path)).then(()=>setSyncDot('online')).catch(()=>setSyncDot('offline'));}
+
+function setupListeners(){
+  const mk=monthKey();
+  unsubs.push(onValue(ref(db,`ffinv/entries/${mk}`),snap=>{entries=snap.val()||{};renderAll();}));
+  unsubs.push(onValue(ref(db,'ffinv/properties'),snap=>{
+    const val=snap.val();
+    if(!val){
+      // Seed default properties from spreadsheet
+      const defaults=['Kirkwood','Marywood','Scottsdale','Phoenix Loft','Sunset','Meadow Valley','Anson','Monticello'];
+      defaults.forEach(name=>{
+        const id='prop_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        fbSet(`ffinv/properties/${id}`,{id,name,type:'str',arv:0,addr:''});
+      });
+    } else {
+      properties=val;renderPropDropdowns();renderPropCards();renderPropList();renderMortgageInputs();renderAll();
+    }
+  }));
+  unsubs.push(onValue(ref(db,'ffinv/mortgages'),snap=>{mortgages=snap.val()||{};if(Object.keys(properties).length){renderDebt();renderMortgageInputs();}}));
+  unsubs.push(onValue(ref(db,'ffinv/cards'),snap=>{cards=snap.val()||{};if(Object.keys(properties).length){renderCardList();renderDebt();}}));
+  unsubs.push(onValue(ref(db,'ffinv/entries'),snap=>{allData=snap.val()||{};renderHistory();}));
+  unsubs.push(onValue(ref(db,'ffinv/flips'),snap=>{flips=snap.val()||{};renderFlips();}));
+  unsubs.push(onValue(ref(db,'ffinv/leases'),snap=>{leases=snap.val()||{};}));
+  unsubs.push(onValue(ref(db,'ffinv/varExps'),snap=>{varExps=snap.val()||{};renderVarExpLog();renderVarExpPropTabs();renderEntries();}));
+}
+
+function renderAll(){renderKPIs();renderNetBox();renderEntries();renderPropCards();}
+
+// ── CALCS ──
+function entryTotals(e){
+  const gross=e.grossRent||0;
+  const platformFee=gross*((e.platformPct||0)/100);
+  const mgmtFee=(e.mgmt||0)>0?(e.mgmt||0):gross*((e.mgmtPct||0)/100);
+  // Include standalone varExps from Firebase that match this property and month
+  const fbVarTotal=Object.values(varExps)
+    .filter(ve=>ve.property===e.property&&ve.date&&ve.date.slice(0,7)===e.month)
+    .reduce((s,ve)=>s+(ve.amount||0),0);
+  const varExpTotal=(e.varExps||[]).reduce((s,v)=>s+(v.amount||0),0)+(e.electric||0)+(e.trash||0)+(e.misc||0)+fbVarTotal;
+  const fixedTotal=(e.mortgage||0)+(e.insurance||0)+(e.internet||0);
+  const totalExp=fixedTotal+platformFee+mgmtFee+varExpTotal;
+  const net=gross-totalExp;
+  return{gross,platformFee,mgmtFee,fixedTotal,varExpTotal,totalExp,net};
+}
+
+function calcMonth(entriesObj=entries){
+  let totalRev=0,totalExp=0,totalNights=0,totalPlatformFees=0;
+  const propStats={};
+  Object.values(entriesObj).forEach(e=>{
+    const t=entryTotals(e);
+    totalRev+=t.gross;totalExp+=t.totalExp;totalNights+=e.nights||0;totalPlatformFees+=t.platformFee;
+    if(!propStats[e.property])propStats[e.property]={rev:0,exp:0,net:0,nights:0};
+    propStats[e.property].rev+=t.gross;
+    propStats[e.property].exp+=t.totalExp;
+    propStats[e.property].net+=t.net;
+    propStats[e.property].nights+=e.nights||0;
+  });
+  const net=totalRev-totalExp;
+  return{totalRev,totalExp,net,totalNights,totalPlatformFees,propStats,entryCount:Object.keys(entriesObj).length};
+}
+
+function m(v){return(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// ── KPIs ──
+function renderKPIs(){
+  const s=calcMonth();
+  const nc=s.net>0?'pos':s.net<0?'neg':'blue';
+  const avgPerNight=s.totalNights>0?s.totalRev/s.totalNights:0;
+  document.getElementById('kpiStrip').innerHTML=`
+    <div class="kpi"><div class="kpi-accent blue"></div><div class="kpi-label">Properties</div><div class="kpi-value blue">${s.entryCount}</div><div class="kpi-sub">logged this month</div></div>
+    <div class="kpi"><div class="kpi-accent white"></div><div class="kpi-label">Total Nights</div><div class="kpi-value">${s.totalNights}</div><div class="kpi-sub">across all properties</div></div>
+    <div class="kpi"><div class="kpi-accent blue"></div><div class="kpi-label">Total Revenue</div><div class="kpi-value">$${s.totalRev>=1000?Math.round(s.totalRev/1000)+'K':m(s.totalRev)}</div><div class="kpi-sub">gross rent collected</div></div>
+    <div class="kpi"><div class="kpi-accent red"></div><div class="kpi-label">Total Expenses</div><div class="kpi-value neg">$${s.totalExp>=1000?Math.round(s.totalExp/1000)+'K':m(s.totalExp)}</div><div class="kpi-sub">incl platform fees</div></div>
+    <div class="kpi"><div class="kpi-accent ${s.net>0?'green':s.net<0?'red':'blue'}"></div><div class="kpi-label">Net Profit</div><div class="kpi-value ${nc}">${s.net>=0?'+':'-'}$${Math.abs(s.net)>=1000?Math.round(Math.abs(s.net)/1000)+'K':m(Math.abs(s.net))}</div><div class="kpi-sub">${avgPerNight>0?'$'+avgPerNight.toFixed(2)+'/night avg':''}</div></div>`;
+}
+
+// ── NET BOX ──
+function renderNetBox(){
+  const s=calcMonth();
+  const cls=s.net>0?'profit':s.net<0?'loss':'even';
+  document.getElementById('netBox').innerHTML=`
+    <div class="net-box ${cls}">
+      <div>
+        <div class="net-label">${s.net>0?'Monthly Profit':s.net<0?'Monthly Loss':'Break Even'} · ${monthLabel()}</div>
+        <div class="net-amount">${s.net>=0?'+':'-'}$${m(Math.abs(s.net))}</div>
+        <div class="net-sub">$${m(s.totalRev)} revenue · $${m(s.totalExp)} expenses · ${s.totalNights} nights</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="net-label">Platform Fees</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--red2);">-$${m(s.totalPlatformFees)}</div>
+        <div class="net-sub">${Object.keys(properties).length} properties in portfolio</div>
+      </div>
+    </div>`;
+}
+
+// ── ENTRY CALCS ──
+let pendingVarExps=[];
+
+window.updateEntryCalcs=function(){
+  const gross=parseFloat(document.getElementById('entryGrossRent').value)||0;
+  const nights=parseFloat(document.getElementById('entryNights').value)||0;
+  const pct=parseFloat(document.getElementById('entryPlatformPct').value)||0;
+  const mortgage=parseFloat(document.getElementById('entryMortgage').value)||0;
+  const insurance=parseFloat(document.getElementById('entryInsurance').value)||0;
+  const internet=parseFloat(document.getElementById('entryInternet').value)||0;
+  const mgmtFlat=parseFloat(document.getElementById('entryMgmt').value)||0;
+  const mgmtPct=parseFloat(document.getElementById('entryMgmtPct').value)||0;
+  const platformFee=gross*(pct/100);
+  const mgmtFee=mgmtFlat>0?mgmtFlat:gross*(mgmtPct/100);
+  const fixedTotal=mortgage+insurance+internet;
+  const varTotal=platformFee+mgmtFee+pendingVarExps.reduce((s,e)=>s+e.amount,0);
+  const net=gross-fixedTotal-varTotal;
+  document.getElementById('calcPerNight').textContent=nights>0?'$'+((gross/nights).toFixed(2)):'—';
+  document.getElementById('calcPlatformFee').textContent=platformFee>0?'-$'+m(platformFee):'—';
+  if(gross>0||fixedTotal>0||varTotal>0){
+    document.getElementById('entryPreview').style.display='block';
+    document.getElementById('previewRev').textContent='$'+m(gross);
+    document.getElementById('previewFixed').textContent='-$'+m(fixedTotal);
+    document.getElementById('previewVar').textContent='-$'+m(varTotal);
+    const netEl=document.getElementById('previewNet');
+    netEl.textContent=(net>=0?'+':'-')+'$'+m(Math.abs(net));
+    netEl.style.color=net>=0?'var(--green)':'var(--red2)';
+  }
+};
+
+window.autoFillFixed=function(){
+  const propName=document.getElementById('entryProp').value;
+  const prop=Object.values(properties).find(p=>p.name===propName);
+  if(prop){
+    if(prop.mortgage) document.getElementById('entryMortgage').value=prop.mortgage;
+    if(prop.insurance) document.getElementById('entryInsurance').value=prop.insurance;
+    if(prop.internet) document.getElementById('entryInternet').value=prop.internet;
+  }
+  updateEntryCalcs();
+};
+
+// standalone var exp functions below
+
+// ── PROP DROPDOWNS ──
+function renderPropDropdowns(){
+  const arr=Object.values(properties).sort((a,b)=>a.name.localeCompare(b.name));
+  const ep=document.getElementById('entryProp'),fp=document.getElementById('filterProp'),vp=document.getElementById('varExpProp');
+  const ce=ep.value,cf=fp.value,cv=vp?vp.value:'';
+  ep.innerHTML=arr.map(p=>`<option value="${p.name}"${p.name===ce?' selected':''}>${p.name}</option>`).join('');
+  fp.innerHTML='<option value="">All Properties</option>'+arr.map(p=>`<option value="${p.name}"${p.name===cf?' selected':''}>${p.name}</option>`).join('');
+  if(vp){vp.innerHTML=arr.map(p=>`<option value="${p.name}"${p.name===cv?' selected':''}>${p.name}</option>`).join('');renderVarExpPropTabs();}
+}
+
+// ── ENTRIES TABLE ──
+let editingEntryId=null;
+
+function editEntryRow(id,e){
+  const t=entryTotals(e);
+  const propArr=Object.values(properties).sort((a,b)=>a.name.localeCompare(b.name));
+  const inpS='width:100%;padding:5px 8px;background:var(--black4);border:1px solid var(--border2);border-radius:6px;color:var(--white);font-size:11px;outline:none;';
+  const varExpHtml=(e.varExps||[]).map((ve,i)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+      <span style="color:var(--white3);">${ve.desc} (${ve.cat||''})</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--red2);">-$${m(ve.amount)}</span>
+    </div>`).join('');
+  return`<tr id="editrow_entry_${id}" style="background:var(--black3);">
+    <td colspan="10" style="padding:12px 10px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Property</div>
+          <select id="ee_prop_${id}" style="${inpS}">${propArr.map(p=>`<option${p.name===e.property?' selected':''}>${p.name}</option>`).join('')}</select></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Month</div><input type="month" id="ee_month_${id}" value="${e.month||''}" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Status</div>
+          <select id="ee_status_${id}" style="${inpS}"><option value="rented"${e.status==='rented'?' selected':''}>Rented</option><option value="vacant"${e.status==='vacant'?' selected':''}>Vacant</option><option value="flip"${e.status==='flip'?' selected':''}>Flip</option></select></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Guest</div><input type="text" id="ee_guest_${id}" value="${e.guest||''}" style="${inpS}"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Gross Rent ($)</div><input type="number" id="ee_rent_${id}" value="${e.grossRent||''}" step="0.01" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Nights</div><input type="number" id="ee_nights_${id}" value="${e.nights||''}" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Platform %</div><input type="number" id="ee_platpct_${id}" value="${e.platformPct||''}" step="0.1" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Checkout Date</div><input type="date" id="ee_checkout_${id}" value="${e.checkout||''}" style="${inpS}"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mortgage ($)</div><input type="number" id="ee_mort_${id}" value="${e.mortgage||''}" step="0.01" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Insurance ($)</div><input type="number" id="ee_ins_${id}" value="${e.insurance||''}" step="0.01" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Internet ($)</div><input type="number" id="ee_inet_${id}" value="${e.internet||''}" step="0.01" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mgmt Fee ($)</div><input type="number" id="ee_mgmt_${id}" value="${e.mgmt||''}" step="0.01" style="${inpS}"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Notes</div><input type="text" id="ee_notes_${id}" value="${e.notes||''}" style="${inpS}"/></div>
+      </div>
+      ${varExpHtml?`<div style="background:var(--black4);border-radius:6px;padding:8px;margin-bottom:8px;"><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Variable Expenses (logged)</div>${varExpHtml}</div>`:''}
+      <div style="display:flex;gap:8px;">
+        <button onclick="saveEditEntry('${id}')" style="flex:1;padding:7px 0;background:var(--green);color:#000;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">✓ Save</button>
+        <button onclick="cancelEditEntry()" style="flex:1;padding:7px 0;background:transparent;color:var(--white4);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;">✕ Cancel</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderEntries(){
+  const tb=document.getElementById('entryBody');
+  const pf=document.getElementById('filterProp')?.value||'';
+  let arr=Object.entries(entries).sort((a,b)=>(b[1].month||'').localeCompare(a[1].month||''));
+  if(pf) arr=arr.filter(([,e])=>e.property===pf);
+  if(!arr.length){tb.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="empty-icon">🏠</div><div class="empty-text">No entries logged yet.</div></div></td></tr>`;return;}
+  let html='';
+  arr.forEach(([id,e])=>{
+    const t=entryTotals(e);
+    const perNight=e.nights>0?t.gross/e.nights:0;
+    const stClass=e.status==='rented'?'active':e.status==='vacant'?'vacant':'flip';
+    const stLabel=e.status==='rented'?'Rented':e.status==='vacant'?'Vacant':'Flip';
+    const isEditing=editingEntryId===id;
+    html+=`<tr style="${isEditing?'opacity:0.4;':''}">
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--white3);">${e.checkin?fd(e.checkin):e.month||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--white3);">${e.checkout?fd(e.checkout):'—'}</td>
+      <td><span class="prop-badge">${e.property||'—'}</span></td>
+      <td><span class="status-badge ${stClass}">${stLabel}</span></td>
+      <td style="font-family:'DM Mono',monospace;color:var(--green);">$${m(t.gross)}</td>
+      <td style="font-family:'DM Mono',monospace;">${e.nights||0}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--red2);">-$${m(t.fixedTotal)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--red2);">-$${m(t.varExpTotal+t.platformFee+t.mgmtFee)}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:600;color:${t.net>=0?'var(--green)':'var(--red2)'};">${t.net>=0?'+':'-'}$${m(Math.abs(t.net))}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--white3);">${perNight>0?'$'+perNight.toFixed(2):'—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm" onclick="editEntry('${id}')" style="color:var(--blue3);border-color:rgba(59,130,246,0.3);margin-right:3px;" title="Edit">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEntry('${id}')" title="Delete">✕</button>
+      </td>
+    </tr>`;
+    if(isEditing) html+=editEntryRow(id,e);
+  });
+  tb.innerHTML=html;
+}
+
+window.editEntry=function(id){editingEntryId=(editingEntryId===id)?null:id;renderEntries();if(editingEntryId)setTimeout(()=>{const r=document.getElementById('editrow_entry_'+id);if(r)r.scrollIntoView({behavior:'smooth',block:'nearest'});},50);};
+window.cancelEditEntry=function(){editingEntryId=null;renderEntries();};
+window.saveEditEntry=function(id){
+  const v=n=>document.getElementById(n+'_'+id)?.value;
+  const orig=entries[id]||{};
+  const updated={...orig,
+    property:v('ee_prop')||orig.property,
+    month:v('ee_month')||orig.month,
+    status:v('ee_status')||orig.status,
+    guest:v('ee_guest')||'',
+    grossRent:parseFloat(v('ee_rent'))||0,
+    nights:parseFloat(v('ee_nights'))||0,
+    platformPct:parseFloat(v('ee_platpct'))||0,
+    checkout:v('ee_checkout')||'',
+    mortgage:parseFloat(v('ee_mort'))||0,
+    insurance:parseFloat(v('ee_ins'))||0,
+    internet:parseFloat(v('ee_inet'))||0,
+    mgmt:parseFloat(v('ee_mgmt'))||0,
+    notes:v('ee_notes')||''
+  };
+  fbSet(`ffinv/entries/${monthKey()}/${id}`,updated).then(()=>{editingEntryId=null;showToast('Entry updated ✓');});
+};
+
+// ── PROPERTY CARDS ──
+function renderPropCards(){
+  const el=document.getElementById('propCards');
+  const s=calcMonth();
+  const arr=Object.values(properties).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!arr.length){el.innerHTML='';return;}
+  el.innerHTML=arr.map(p=>{
+    const ps=s.propStats[p.name]||{rev:0,exp:0,net:0,nights:0};
+    const nc=ps.net>0?'var(--green)':ps.net<0?'var(--red2)':'var(--white3)';
+    const typeLabel={str:'STR',ltr:'LTR',flip:'Flip'}[p.type]||p.type;
+    const typeClass={str:'blue',ltr:'pos',flip:'amber'}[p.type]||'blue';
+    // Find mortgage for this property
+    const mort=Object.values(mortgages).find(m=>m.property===p.name);
+    return`<div class="prop-card">
+      <div class="prop-card-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="prop-icon">🏠</div>
+          <div>
+            <div style="font-weight:700;font-size:14px;">${p.name}</div>
+            <div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${p.addr||'No address set'}</div>
+          </div>
+        </div>
+        <span class="tag ${typeClass}">${typeLabel}</span>
+      </div>
+      <div class="prop-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+          <div class="stat-mini"><div class="stat-mini-label">Revenue</div><div class="stat-mini-value" style="color:var(--green);font-size:16px;">$${ps.rev>=1000?Math.round(ps.rev/1000)+'K':m(ps.rev)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Expenses</div><div class="stat-mini-value" style="color:var(--red2);font-size:16px;">$${ps.exp>=1000?Math.round(ps.exp/1000)+'K':m(ps.exp)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Net</div><div class="stat-mini-value" style="color:${nc};font-size:16px;">${ps.net>=0?'+':'-'}$${Math.abs(ps.net)>=1000?Math.round(Math.abs(ps.net)/1000)+'K':m(Math.abs(ps.net))}</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-family:'DM Mono',monospace;color:var(--white4);">
+          <span>${ps.nights} nights booked</span>
+          ${mort?`<span>Mortgage: $${m(mort.payment)}/mo</span>`:''}
+          ${p.arv?`<span>ARV: $${Number(p.arv).toLocaleString()}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── PROP LIST (Settings) ──
+function renderPropList(){
+  const el=document.getElementById('propList');
+  const arr=Object.entries(properties).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  if(!arr.length){el.innerHTML='<div class="empty"><div class="empty-text">No properties yet.</div></div>';return;}
+  const inpS='width:100%;padding:5px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-family:DM Mono,monospace;font-size:12px;outline:none;text-align:right;';
+  el.innerHTML=arr.map(([id,p])=>`
+    <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${p.name}</div>
+          <div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${{str:'STR',ltr:'LTR',flip:'Flip'}[p.type]||p.type} · ${p.addr||'No address'} ${p.mgmtName?'· Mgmt: '+p.mgmtName:''}</div>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="deleteProp('${id}')">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mortgage ($/mo)</div><input type="number" step="0.01" value="${p.mortgage||''}" placeholder="0.00" style="${inpS}" onchange="updatePropFixed('${id}','mortgage',this.value)"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Insurance ($/mo)</div><input type="number" step="0.01" value="${p.insurance||''}" placeholder="0.00" style="${inpS}" onchange="updatePropFixed('${id}','insurance',this.value)"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Internet ($/mo)</div><input type="number" step="0.01" value="${p.internet||''}" placeholder="0.00" style="${inpS}" onchange="updatePropFixed('${id}','internet',this.value)"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mgmt Co (AZ)</div><input type="text" value="${p.mgmtName||''}" placeholder="e.g. Vacasa" style="${inpS};text-align:left;" onchange="updatePropFixed('${id}','mgmtName',this.value)"/></div>
+      </div>
+    </div>`).join('');
+}
+
+window.updatePropFixed=function(id,field,val){
+  const v=field==='mgmtName'?val:(parseFloat(val)||0);
+  fbSet(`ffinv/properties/${id}/${field}`,v).then(()=>showToast('Saved ✓'));
+};
+
+// ── MORTGAGE INPUTS ──
+function renderMortgageInputs(){
+  const el=document.getElementById('mortgageInputs');
+  const arr=Object.values(properties).sort((a,b)=>a.name.localeCompare(b.name));
+  el.innerHTML=arr.map(p=>{
+    const mort=Object.values(mortgages).find(m=>m.property===p.name)||{balance:0,payment:0,arv:0};
+    return`<div style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:var(--blue3);">${p.name}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Loan Balance</div><input type="number" step="0.01" value="${mort.balance||''}" placeholder="0" style="width:100%;padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;" onchange="updateMortgage('${p.name}','balance',this.value)"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Monthly Payment</div><input type="number" step="0.01" value="${mort.payment||''}" placeholder="0" style="width:100%;padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;" onchange="updateMortgage('${p.name}','payment',this.value)"/></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">ARV ($)</div><input type="number" step="1000" value="${mort.arv||p.arv||''}" placeholder="0" style="width:100%;padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;" onchange="updateMortgage('${p.name}','arv',this.value)"/></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── CARD LIST ──
+function renderCardList(){
+  const el=document.getElementById('cardList');
+  const arr=Object.entries(cards);
+  if(!arr.length){el.innerHTML='<div class="empty"><div class="empty-text">No cards added yet.</div></div>';return;}
+  el.innerHTML=arr.map(([id,c])=>`
+    <div class="entity-row">
+      <div><div style="font-weight:600;">${c.name}</div><div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">Limit: $${Number(c.limit||0).toLocaleString()}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--white4);margin-bottom:2px;">Balance</div><input type="number" step="0.01" value="${c.balance||0}" style="width:100px;padding:4px 8px;background:var(--black3);border:1px solid var(--border);border-radius:5px;color:var(--white);font-size:11px;outline:none;" onchange="updateCardBalance('${id}',this.value)"/></div>
+        <button class="btn btn-sm btn-danger" onclick="deleteCard('${id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── DEBT ──
+function renderDebt(){
+  const mortArr=Object.values(mortgages);
+  const cardArr=Object.values(cards);
+  const totalMortBalance=mortArr.reduce((s,m)=>s+(m.balance||0),0);
+  const totalMortPayment=mortArr.reduce((s,m)=>s+(m.payment||0),0);
+  const totalARV=mortArr.reduce((s,m)=>s+(m.arv||0),0);
+  const totalCardBalance=cardArr.reduce((s,c)=>s+(c.balance||0),0);
+  const totalCardLimit=cardArr.reduce((s,c)=>s+(c.limit||0),0);
+  const totalDebt=totalMortBalance+totalCardBalance;
+  const equity=totalARV-totalDebt;
+  const ltvPct=totalARV>0?(totalDebt/totalARV)*100:0;
+
+  document.getElementById('equityHero').innerHTML=`
+    <div class="equity-hero">
+      <div class="equity-lbl">Total Portfolio Equity</div>
+      <div class="equity-amt" style="color:${equity>=0?'var(--green)':'var(--red2)'};">${equity>=0?'+':'-'}$${Math.abs(equity).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;">
+        <div class="stat-mini"><div class="stat-mini-label">Total ARV</div><div class="stat-mini-value" style="color:var(--blue3);font-size:16px;">$${(totalARV/1000000).toFixed(2)}M</div></div>
+        <div class="stat-mini"><div class="stat-mini-label">Mortgage Debt</div><div class="stat-mini-value" style="color:var(--red2);font-size:16px;">$${(totalMortBalance/1000000).toFixed(2)}M</div></div>
+        <div class="stat-mini"><div class="stat-mini-label">Card Debt</div><div class="stat-mini-value" style="color:var(--red2);font-size:16px;">$${m(totalCardBalance)}</div></div>
+        <div class="stat-mini"><div class="stat-mini-label">LTV</div><div class="stat-mini-value" style="color:${ltvPct<70?'var(--green)':ltvPct<85?'var(--amber)':'var(--red2)'};">${ltvPct.toFixed(1)}%</div></div>
+      </div>
+    </div>`;
+
+  document.getElementById('debtSummary').innerHTML=`
+    <div class="debt-card">
+      <div class="debt-label">Total Mortgage Balance</div>
+      <div class="debt-value" style="color:var(--red2);">$${m(totalMortBalance)}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);margin-top:4px;">${mortArr.length} loans</div>
+    </div>
+    <div class="debt-card">
+      <div class="debt-label">Monthly Mortgage Payments</div>
+      <div class="debt-value" style="color:var(--red2);">$${m(totalMortPayment)}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);margin-top:4px;">per month total</div>
+    </div>
+    <div class="debt-card">
+      <div class="debt-label">Total Credit Card Balance</div>
+      <div class="debt-value" style="color:var(--red2);">$${m(totalCardBalance)}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);margin-top:4px;">of $${Number(totalCardLimit).toLocaleString()} limit</div>
+    </div>
+    <div class="debt-card">
+      <div class="debt-label">Total Portfolio ARV</div>
+      <div class="debt-value" style="color:var(--blue3);">$${(totalARV/1000000).toFixed(3)}M</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);margin-top:4px;">after repair value</div>
+    </div>`;
+}
+
+// ── HISTORY ──
+function renderHistory(){
+  const months=Object.keys(allData).sort().reverse().slice(0,12);
+  if(!months.length){
+    document.getElementById('monthHistGrid').innerHTML=`<div class="empty"><div class="empty-text">No historical data yet.</div></div>`;
+    document.getElementById('revenueChart').innerHTML=`<div class="empty"><div class="empty-text">No data yet.</div></div>`;
+    return;
+  }
+  const chartData=months.slice().reverse().map(mk=>{
+    const ms=calcMonth(allData[mk]||{});
+    const[yr,mo]=mk.split('-');
+    return{label:`${MONTHS[parseInt(mo)-1].slice(0,3)} ${yr.slice(2)}`,rev:ms.totalRev,net:ms.net};
+  });
+  const maxVal=Math.max(...chartData.map(d=>Math.max(d.rev,Math.abs(d.net))),1);
+  const chartH=140,barW=Math.max(24,Math.floor(560/chartData.length)-8),svgW=chartData.length*(barW+8)+40;
+  let svgBars='';
+  chartData.forEach((d,i)=>{
+    const x=i*(barW+8)+30;
+    const revH=Math.round((d.rev/maxVal)*chartH);
+    const netH=Math.round((Math.abs(d.net)/maxVal)*chartH);
+    svgBars+=`<rect x="${x}" y="${chartH-revH+10}" width="${barW*0.48}" height="${revH}" rx="3" fill="rgba(59,130,246,0.4)"/>
+    <rect x="${x+barW*0.52}" y="${chartH-netH+10}" width="${barW*0.48}" height="${netH}" rx="3" fill="${d.net>=0?'rgba(16,185,129,0.6)':'rgba(230,57,70,0.6)'}"/>
+    <text x="${x+barW/2}" y="${chartH+22}" text-anchor="middle" fill="var(--white4)" font-size="9" font-family="DM Mono,monospace">${d.label}</text>`;
+  });
+  document.getElementById('revenueChart').innerHTML=`
+    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:10px;font-family:'DM Mono',monospace;">
+      <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:rgba(59,130,246,0.4);border-radius:2px;display:inline-block;"></span>Revenue</span>
+      <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:rgba(16,185,129,0.6);border-radius:2px;display:inline-block;"></span>Net Profit</span>
+    </div>
+    <div style="overflow-x:auto;"><svg width="${Math.max(svgW,300)}" height="${chartH+35}" style="display:block;">${svgBars}</svg></div>`;
+  document.getElementById('monthHistGrid').innerHTML=months.map(mk=>{
+    const ms=calcMonth(allData[mk]||{});
+    const[yr,mo]=mk.split('-');
+    return`<div class="month-hist-card">
+      <div class="month-hist-label">${MONTHS[parseInt(mo)-1]} ${yr}</div>
+      <div class="month-hist-val" style="color:${ms.net>=0?'var(--green)':'var(--red2)'};">${ms.net>=0?'+':'-'}$${m(Math.abs(ms.net))}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);margin-top:4px;">$${m(ms.totalRev)} rev · ${ms.totalNights} nights</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);">${ms.entryCount} properties logged</div>
+    </div>`;
+  }).join('');
+}
+
+// ── ACTIONS ──
+
+window.toggleEntryType=function(){
+  const type=document.getElementById('entryType').value;
+  const isMulti=type==='multi';
+  document.getElementById('singleMonthRow').style.display=isMulti?'none':'grid';
+  document.getElementById('multiMonthRow').style.display=isMulti?'block':'none';
+  document.getElementById('rentLabel').textContent=isMulti?'(per month)':'(this month)';
+  document.getElementById('addEntryBtn').textContent=isMulti?'+ Log Lease (auto-fills all months)':'+ Log Entry';
+  updateEntryCalcs();
+};
+
+window.calcLeaseNights=function(){
+  const cin=document.getElementById('leaseCheckin').value;
+  const cout=document.getElementById('leaseCheckout').value;
+  if(!cin||!cout) return;
+  const d1=new Date(cin), d2=new Date(cout);
+  if(d2<=d1){document.getElementById('leaseNightsCalc').value='';return;}
+  const nights=Math.round((d2-d1)/(1000*60*60*24));
+  document.getElementById('leaseNightsCalc').value=nights;
+  // Also calc months covered
+  const months=[];
+  let y=d1.getFullYear(), mo=d1.getMonth();
+  const ey=d2.getFullYear(), emo=d2.getMonth();
+  while(y<ey||(y===ey&&mo<=emo)){
+    months.push(new Date(y,mo,1).toLocaleString('default',{month:'short'})+' '+String(y).slice(2));
+    mo++;if(mo>11){mo=0;y++;}
+  }
+  document.getElementById('leaseMonthsDisplay').value=months.length===1?months[0]:months[0]+' – '+months[months.length-1]+' ('+months.length+'mo)';
+  // set entryNights to total nights for preview
+  document.getElementById('entryNights').value=nights;
+  updateEntryCalcs();
+};
+
+window.addEntry=function(){
+  const prop=document.getElementById('entryProp').value;
+  const status=document.getElementById('entryStatus').value;
+  const checkin=document.getElementById('entryCheckin').value;
+  const checkout=document.getElementById('entryCheckout').value;
+  const grossRent=parseFloat(document.getElementById('entryGrossRent').value)||0;
+  const platformPct=parseFloat(document.getElementById('entryPlatformPct').value)||0;
+  const guest=document.getElementById('entryGuest').value.trim();
+  const mortgage=parseFloat(document.getElementById('entryMortgage').value)||0;
+  const insurance=parseFloat(document.getElementById('entryInsurance').value)||0;
+  const internet=parseFloat(document.getElementById('entryInternet').value)||0;
+  const mgmt=parseFloat(document.getElementById('entryMgmt').value)||0;
+  const mgmtPct=parseFloat(document.getElementById('entryMgmtPct').value)||0;
+  const notes=document.getElementById('entryNotes').value.trim();
+  if(!prop){showToast('Select a property');return;}
+  if(!checkin||!checkout){showToast('Enter check-in and check-out dates');return;}
+  const d1=new Date(checkin),d2=new Date(checkout);
+  if(d2<=d1){showToast('Check-out must be after check-in');return;}
+  const totalNights=Math.round((d2-d1)/(1000*60*60*24));
+  const startMk=`${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}`;
+  const endMk=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}`;
+  const months=getLeaseMonths(startMk,endMk);
+  const daysInMonth=mk=>{const[y,mo]=mk.split('-').map(Number);return new Date(y,mo,0).getDate();};
+  const totalDays=months.reduce((s,mk)=>s+daysInMonth(mk),0);
+  months.forEach((mk,i)=>{
+    const id=`entry_${mk}_${Date.now()+i}`;
+    const moNights=months.length===1?totalNights:Math.round((daysInMonth(mk)/totalDays)*totalNights);
+    const entryData={id,property:prop,month:mk,status,grossRent,nights:moNights,platformPct,guest,
+      mortgage,insurance,internet,mgmt,mgmtPct,checkin:i===0?checkin:'',checkout:i===months.length-1?checkout:'',notes};
+    fbSet(`ffinv/entries/${mk}/${id}`,entryData);
+  });
+  const msg=months.length>1?`Logged — ${months.length} months auto-filled ✓`:'Entry logged ✓';
+  ['entryGrossRent','entryNights','entryPlatformPct','entryGuest','entryMortgage','entryInsurance',
+   'entryInternet','entryMgmt','entryMgmtPct','entryNotes','entryCheckin','entryCheckout','entryMonthsDisplay'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+  document.getElementById('entryPreview').style.display='none';
+  showToast(msg);
+};
+
+window.deleteEntry=function(id){if(confirm('Delete this entry?'))fbRemove(`ffinv/entries/${monthKey()}/${id}`);};
+
+window.addProperty=function(){
+  const name=document.getElementById('newPropName').value.trim();
+  const addr=document.getElementById('newPropAddr').value.trim();
+  const type=document.getElementById('newPropType').value;
+  const arv=parseFloat(document.getElementById('newPropARV').value)||0;
+  if(!name){showToast('Enter a property name');return;}
+  if(Object.values(properties).find(p=>p.name===name)){showToast('Property already exists');return;}
+  const id=`prop_${Date.now()}`;
+  const mortgage=parseFloat(document.getElementById('newPropMortgage').value)||0;
+  const insurance=parseFloat(document.getElementById('newPropInsurance').value)||0;
+  const internet=parseFloat(document.getElementById('newPropInternet').value)||0;
+  const mgmtName=document.getElementById('newPropMgmtName').value.trim();
+  fbSet(`ffinv/properties/${id}`,{id,name,addr,type,arv,mortgage,insurance,internet,mgmtName});
+  ['newPropName','newPropAddr','newPropARV','newPropMortgage','newPropInsurance','newPropInternet','newPropMgmtName'].forEach(f=>document.getElementById(f).value='');
+  showToast('Property added ✓');
+};
+
+window.deleteProp=function(id){if(confirm('Delete this property?'))fbRemove(`ffinv/properties/${id}`);};
+
+window.updateMortgage=function(propName,field,val){
+  const existing=Object.entries(mortgages).find(([,m])=>m.property===propName);
+  const id=existing?existing[0]:`mort_${Date.now()}_${propName.replace(/\s/g,'_')}`;
+  const current=existing?existing[1]:{property:propName,balance:0,payment:0,arv:0};
+  current[field]=parseFloat(val)||0;
+  fbSet(`ffinv/mortgages/${id}`,{...current,id,property:propName}).then(()=>showToast('Saved ✓'));
+};
+
+window.saveMortgages=function(){showToast('Mortgages saved ✓');};
+
+window.addCard=function(){
+  const name=document.getElementById('newCardName').value.trim();
+  const limit=parseFloat(document.getElementById('newCardLimit').value)||0;
+  if(!name){showToast('Enter card name');return;}
+  const id=`card_${Date.now()}`;
+  fbSet(`ffinv/cards/${id}`,{id,name,limit,balance:0});
+  document.getElementById('newCardName').value='';
+  document.getElementById('newCardLimit').value='';
+  showToast('Card added ✓');
+};
+
+window.updateCardBalance=function(id,val){fbSet(`ffinv/cards/${id}/balance`,parseFloat(val)||0).then(()=>showToast('Balance updated ✓'));};
+window.deleteCard=function(id){fbRemove(`ffinv/cards/${id}`);};
+window.saveCards=function(){showToast('Cards saved ✓');};
+
+window.exportCSV=function(){
+  const arr=Object.values(entries);
+  if(!arr.length){showToast('No entries to export');return;}
+  const headers=['Month','Property','Status','Gross Rent','Nights','Platform %','Platform Fee','Mortgage','Insurance','Internet','Electric','Trash/Water','Misc','Total Expenses','Net Profit','Avg/Night','Guest','Notes'];
+  const rows=arr.map(e=>{
+    const pf=(e.grossRent||0)*((e.platformPct||0)/100);
+    const totalExp=(e.mortgage||0)+(e.insurance||0)+(e.internet||0)+(e.electric||0)+(e.trash||0)+(e.misc||0)+pf;
+    const net=(e.grossRent||0)-totalExp;
+    const perNight=e.nights>0?(e.grossRent||0)/e.nights:0;
+    return[e.month,e.property,e.status,m(e.grossRent||0),e.nights||0,e.platformPct||0,m(pf),m(e.mortgage||0),m(e.insurance||0),m(e.internet||0),m(e.electric||0),m(e.trash||0),m(e.misc||0),m(totalExp),m(net),perNight>0?perNight.toFixed(2):'',e.guest||'',e.notes||''];
+  });
+  const csv=[headers,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`FFINV-${monthKey()}.csv`;a.click();
+  showToast('CSV exported ✓');
+};
+
+
+// ── FLIPS ──
+function flipStatusLabel(s){return{planning:'Planning',active:'In Progress',complete:'Complete',sold:'Sold'}[s]||s;}
+function flipStatusColor(s){return{planning:'var(--blue3)',active:'var(--amber)',complete:'var(--green)',sold:'var(--green)'}[s]||'var(--white3)';}
+function flipStatusBg(s){return{planning:'var(--blue-dim)',active:'var(--amber-dim)',complete:'var(--green-dim)',sold:'var(--green-dim)'}[s]||'var(--black3)';}
+
+function renderFlips(){
+  const el=document.getElementById('flipCards');
+  if(!el)return;
+  const arr=Object.entries(flips).sort((a,b)=>(b[1].start||'').localeCompare(a[1].start||''));
+  if(!arr.length){
+    el.innerHTML=`<div class="empty"><div class="empty-icon">🔨</div><div class="empty-text">No flips added yet.</div></div>`;
+    return;
+  }
+  el.innerHTML=arr.map(([id,f])=>{
+    const totalSpent=Object.values(f.expenses||{}).reduce((s,e)=>s+e.amount,0);
+    const totalDraws=Object.values(f.draws||{}).reduce((s,d)=>s+d.amount,0);
+    const holdingCosts=Object.values(f.holding||{}).reduce((s,h)=>s+h.amount,0);
+    const moInterest=f.loanAmt&&f.rate?(f.loanAmt*(f.rate/100)/12):0;
+    const totalCost=(f.purchase||0)+totalSpent+holdingCosts;
+    const projProfit=(f.arv||0)-totalCost-(f.loanAmt||0>0?moInterest*((f.term||12)):0);
+    const budgetPct=f.budget>0?Math.min(100,(totalSpent/f.budget)*100):0;
+    const today=new Date();
+    const startD=f.start?new Date(f.start):null;
+    const targetD=f.target?new Date(f.target):null;
+    const daysIn=startD?Math.round((today-startD)/(1000*60*60*24)):0;
+    const totalDays=startD&&targetD?Math.round((targetD-startD)/(1000*60*60*24)):0;
+    const timelinePct=totalDays>0?Math.min(100,(daysIn/totalDays)*100):0;
+    const tc=timelinePct>85?'var(--red2)':timelinePct>60?'var(--amber)':'var(--green)';
+    const bc=budgetPct>90?'var(--red2)':budgetPct>70?'var(--amber)':'var(--green)';
+
+    const expenseRows=Object.entries(f.expenses||{}).map(([eid,e])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <div style="flex:1;">
+          <div style="font-weight:600;">${e.desc}</div>
+          <div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${e.cat} · ${e.date||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;">
+            <div style="font-family:'DM Mono',monospace;color:var(--red2);">-$${m(e.amount)}</div>
+            ${e.budget?`<div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">Budgeted: $${m(e.budget)}</div>`:''}
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="deleteFlipExpense('${id}','${eid}')">✕</button>
+        </div>
+      </div>`).join('');
+
+    const drawRows=Object.entries(f.draws||{}).map(([did,d])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <div><div style="font-weight:600;">${d.desc||'Draw'}</div><div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${d.date||''}</div></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:'DM Mono',monospace;color:var(--blue3);">$${m(d.amount)}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteFlipDraw('${id}','${did}')">✕</button>
+        </div>
+      </div>`).join('');
+
+    const holdingRows=Object.entries(f.holding||{}).map(([hid,h])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <div><div style="font-weight:600;">${h.desc}</div><div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${h.date||''}</div></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:'DM Mono',monospace;color:var(--red2);">-$${m(h.amount)}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteFlipHolding('${id}','${hid}')">✕</button>
+        </div>
+      </div>`).join('');
+
+    return`<div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:var(--white);">${f.name||'Unnamed Flip'}</span>
+          <span style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${f.addr||''}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:10px;background:${flipStatusBg(f.status)};color:${flipStatusColor(f.status)};padding:3px 9px;border-radius:4px;font-family:'DM Mono',monospace;">${flipStatusLabel(f.status)}</span>
+          <select onchange="updateFlipStatus('${id}',this.value)" style="background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:10px;padding:3px 6px;outline:none;">
+            ${['planning','active','complete','sold'].map(s=>`<option value="${s}"${f.status===s?' selected':''}>${flipStatusLabel(s)}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm btn-danger" onclick="deleteFlip('${id}')">✕</button>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;">
+          <div class="stat-mini"><div class="stat-mini-label">Purchase</div><div class="stat-mini-value" style="font-size:16px;">$${f.purchase>=1000?(f.purchase/1000).toFixed(0)+'K':m(f.purchase||0)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Rehab Spent</div><div class="stat-mini-value" style="font-size:16px;color:var(--amber);">$${totalSpent>=1000?(totalSpent/1000).toFixed(0)+'K':m(totalSpent)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Holding Costs</div><div class="stat-mini-value" style="font-size:16px;color:var(--red2);">$${holdingCosts>=1000?(holdingCosts/1000).toFixed(0)+'K':m(holdingCosts)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">ARV</div><div class="stat-mini-value" style="font-size:16px;color:var(--blue3);">$${f.arv>=1000?(f.arv/1000).toFixed(0)+'K':m(f.arv||0)}</div></div>
+          <div class="stat-mini"><div class="stat-mini-label">Proj. Profit</div><div class="stat-mini-value" style="font-size:16px;color:${projProfit>=0?'var(--green)':'var(--red2)'};">${projProfit>=0?'+':'-'}$${Math.abs(projProfit)>=1000?(Math.abs(projProfit)/1000).toFixed(0)+'K':m(Math.abs(projProfit))}</div></div>
+        </div>
+
+        <!-- Progress bars -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div>
+            <div class="progress-labels"><span>Rehab Budget</span><span style="color:${bc};">$${m(totalSpent)} / $${m(f.budget||0)}</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${budgetPct}%;background:${bc};"></div></div>
+          </div>
+          <div>
+            <div class="progress-labels"><span>Timeline</span><span style="color:${tc};">${daysIn}d in${totalDays>0?' / '+totalDays+'d':''}</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${timelinePct}%;background:${tc};"></div></div>
+          </div>
+        </div>
+
+        <!-- Kiavi section -->
+        <div style="background:var(--black3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div class="section-title" style="font-size:11px;margin-bottom:10px;">Kiavi Loan</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+            <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Loan Amount</div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--white);">$${m(f.loanAmt||0)}</div></div>
+            <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Rate</div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--white);">${f.rate||0}%</div></div>
+            <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Term</div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--white);">${f.term||12} mo</div></div>
+            <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--white4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Mo. Interest</div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--red2);">$${m(moInterest)}</div></div>
+          </div>
+          <div style="margin-bottom:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--white4);">Total Draws Released: <span style="color:var(--blue3);">$${m(totalDraws)}</span></div>
+          ${drawRows?`<div style="margin-bottom:8px;">${drawRows}</div>`:''}
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
+            <div class="field"><label>Draw Amount ($)</label><input type="number" id="draw_amt_${id}" placeholder="0" style="padding:6px 8px;background:var(--black4);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Description</label><input type="text" id="draw_desc_${id}" placeholder="Draw #2" style="padding:6px 8px;background:var(--black4);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Date</label><input type="date" id="draw_date_${id}" style="padding:6px 8px;background:var(--black4);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+          </div>
+          <button class="btn btn-sm" style="color:var(--blue3);border-color:rgba(59,130,246,0.3);margin-top:6px;" onclick="addFlipDraw('${id}')">+ Log Draw</button>
+        </div>
+
+        <!-- Rehab Expenses -->
+        <div style="margin-bottom:14px;">
+          <div class="section-title" style="font-size:11px;margin-bottom:8px;">Rehab Expenses</div>
+          ${expenseRows||`<div style="font-size:12px;color:var(--white4);padding:8px 0;">No expenses logged yet.</div>`}
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px;">
+            <div class="field"><label>Description</label><input type="text" id="exp_desc_${id}" placeholder="Demo labor" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Amount ($)</label><input type="number" id="exp_amt_${id}" placeholder="0" step="0.01" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Budgeted ($)</label><input type="number" id="exp_budget_${id}" placeholder="0" step="0.01" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Category</label>
+              <select id="exp_cat_${id}" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;">
+                <option>Demo / Debris</option><option>Foundation</option><option>Framing</option>
+                <option>Roofing</option><option>Plumbing</option><option>Electrical</option>
+                <option>HVAC</option><option>Drywall</option><option>Flooring</option>
+                <option>Cabinets / Counters</option><option>Paint</option><option>Landscaping</option>
+                <option>Permits / Fees</option><option>Materials</option><option>Labor</option><option>Other</option>
+              </select>
+            </div>
+            <div class="field"><label>Date</label><input type="date" id="exp_date_${id}" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+          </div>
+          <button class="btn btn-sm" style="color:var(--amber);border-color:rgba(245,158,11,0.3);margin-top:6px;" onclick="addFlipExpense('${id}')">+ Log Expense</button>
+        </div>
+
+        <!-- Holding Costs -->
+        <div>
+          <div class="section-title" style="font-size:11px;margin-bottom:8px;">Holding Costs</div>
+          ${holdingRows||`<div style="font-size:12px;color:var(--white4);padding:8px 0;">No holding costs logged yet.</div>`}
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;">
+            <div class="field"><label>Description</label><input type="text" id="hold_desc_${id}" placeholder="Kiavi payment" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Amount ($)</label><input type="number" id="hold_amt_${id}" placeholder="0" step="0.01" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+            <div class="field"><label>Category</label>
+              <select id="hold_cat_${id}" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;">
+                <option>Kiavi Interest</option><option>Insurance</option><option>Property Tax</option>
+                <option>Utilities</option><option>HOA</option><option>Other</option>
+              </select>
+            </div>
+            <div class="field"><label>Date</label><input type="date" id="hold_date_${id}" style="padding:6px 8px;background:var(--black3);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;outline:none;width:100%;"/></div>
+          </div>
+          <button class="btn btn-sm" style="color:var(--red2);border-color:rgba(230,57,70,0.3);margin-top:6px;" onclick="addFlipHolding('${id}')">+ Log Holding Cost</button>
+        </div>
+
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.addFlip=function(){
+  const name=document.getElementById('flipName').value.trim();
+  const addr=document.getElementById('flipAddr').value.trim();
+  const purchase=parseFloat(document.getElementById('flipPurchase').value)||0;
+  const arv=parseFloat(document.getElementById('flipARV').value)||0;
+  const budget=parseFloat(document.getElementById('flipBudget').value)||0;
+  const start=document.getElementById('flipStart').value;
+  const target=document.getElementById('flipTarget').value;
+  const status=document.getElementById('flipStatus').value;
+  const loanAmt=parseFloat(document.getElementById('flipLoanAmt').value)||0;
+  const rate=parseFloat(document.getElementById('flipRate').value)||0;
+  const term=parseInt(document.getElementById('flipTerm').value)||12;
+  const draw1=parseFloat(document.getElementById('flipDraw1').value)||0;
+  if(!name){showToast('Enter a property name');return;}
+  const id=`flip_${Date.now()}`;
+  const flipData={id,name,addr,purchase,arv,budget,start,target,status,loanAmt,rate,term,expenses:{},draws:{},holding:{}};
+  if(draw1>0){const did=`draw_${Date.now()}`;flipData.draws[did]={id:did,amount:draw1,desc:'Draw #1',date:start};}
+  fbSet(`ffinv/flips/${id}`,flipData);
+  ['flipName','flipAddr','flipPurchase','flipARV','flipBudget','flipStart','flipTarget','flipLoanAmt','flipRate','flipDraw1'].forEach(f=>document.getElementById(f).value='');
+  showToast('Flip added ✓');
+};
+
+window.updateFlipStatus=function(id,status){fbSet(`ffinv/flips/${id}/status`,status);};
+window.deleteFlip=function(id){if(confirm('Delete this flip?'))fbRemove(`ffinv/flips/${id}`);};
+
+window.addFlipExpense=function(id){
+  const desc=document.getElementById(`exp_desc_${id}`)?.value.trim();
+  const amt=parseFloat(document.getElementById(`exp_amt_${id}`)?.value)||0;
+  const budget=parseFloat(document.getElementById(`exp_budget_${id}`)?.value)||0;
+  const cat=document.getElementById(`exp_cat_${id}`)?.value;
+  const date=document.getElementById(`exp_date_${id}`)?.value;
+  if(!desc||!amt){showToast('Enter description and amount');return;}
+  const eid=`exp_${Date.now()}`;
+  fbSet(`ffinv/flips/${id}/expenses/${eid}`,{id:eid,desc,amount:amt,budget,cat,date}).then(()=>showToast('Expense logged ✓'));
+};
+window.deleteFlipExpense=function(fid,eid){fbRemove(`ffinv/flips/${fid}/expenses/${eid}`);};
+
+window.addFlipDraw=function(id){
+  const amt=parseFloat(document.getElementById(`draw_amt_${id}`)?.value)||0;
+  const desc=document.getElementById(`draw_desc_${id}`)?.value.trim()||'Draw';
+  const date=document.getElementById(`draw_date_${id}`)?.value;
+  if(!amt){showToast('Enter draw amount');return;}
+  const did=`draw_${Date.now()}`;
+  fbSet(`ffinv/flips/${id}/draws/${did}`,{id:did,amount:amt,desc,date}).then(()=>showToast('Draw logged ✓'));
+};
+window.deleteFlipDraw=function(fid,did){fbRemove(`ffinv/flips/${fid}/draws/${did}`);};
+
+window.addFlipHolding=function(id){
+  const desc=document.getElementById(`hold_desc_${id}`)?.value.trim();
+  const amt=parseFloat(document.getElementById(`hold_amt_${id}`)?.value)||0;
+  const cat=document.getElementById(`hold_cat_${id}`)?.value;
+  const date=document.getElementById(`hold_date_${id}`)?.value;
+  if(!desc||!amt){showToast('Enter description and amount');return;}
+  const hid=`hold_${Date.now()}`;
+  fbSet(`ffinv/flips/${id}/holding/${hid}`,{id:hid,desc,amount:amt,cat,date}).then(()=>showToast('Holding cost logged ✓'));
+};
+window.deleteFlipHolding=function(fid,hid){fbRemove(`ffinv/flips/${fid}/holding/${hid}`);};
+
+
+// ── LEASES ──
+function renderLeaseList(){
+  const el=document.getElementById('leaseList');
+  if(!el) return;
+  const arr=Object.entries(leases).sort((a,b)=>(b[1].start||'').localeCompare(a[1].start||''));
+  if(!arr.length){el.innerHTML=`<div class="empty"><div class="empty-text">No leases added yet.</div></div>`;return;}
+  el.innerHTML=arr.map(([id,l])=>{
+    const months=getLeaseMonths(l.start,l.end);
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px;">
+      <div>
+        <div style="font-weight:700;font-size:13px;">${l.property} — ${l.tenant||'No tenant'}</div>
+        <div style="font-size:10px;color:var(--white4);font-family:'DM Mono',monospace;">${l.start} → ${l.end} · ${months.length} months · $${m(l.rent||0)}/mo</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green);">$${m((l.rent||0)*months.length)} total</span>
+        <button class="btn btn-sm btn-danger" onclick="deleteLease('${id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getLeaseMonths(start,end){
+  if(!start||!end) return[];
+  const months=[];
+  let [sy,sm]=start.split('-').map(Number);
+  const [ey,em]=end.split('-').map(Number);
+  while(sy<ey||(sy===ey&&sm<=em)){
+    months.push(`${sy}-${String(sm).padStart(2,'0')}`);
+    sm++;if(sm>12){sm=1;sy++;}
+  }
+  return months;
+}
+
+window.deleteLease=function(id){if(!confirm('Delete this lease?'))return;fbRemove(`ffinv/leases/${id}`);};
+
+
+// ── STANDALONE VAR EXPENSES ──
+let activeVarExpProp='';
+
+window.addStandaloneVarExp=function(){
+  const prop=document.getElementById('varExpProp').value;
+  const desc=document.getElementById('varExpDesc').value.trim();
+  const amt=parseFloat(document.getElementById('varExpAmt').value)||0;
+  const cat=document.getElementById('varExpCat').value;
+  const date=document.getElementById('varExpDate').value||new Date().toISOString().split('T')[0];
+  if(!prop){showToast('Select a property');return;}
+  if(!desc||!amt){showToast('Enter description and amount');return;}
+  const id=`ve_${Date.now()}`;
+  fbSet(`ffinv/varExps/${id}`,{id,property:prop,desc,amount:amt,cat,date});
+  document.getElementById('varExpDesc').value='';
+  document.getElementById('varExpAmt').value='';
+  showToast('Expense added ✓');
+};
+
+window.deleteStandaloneVarExp=function(id){fbRemove(`ffinv/varExps/${id}`);};
+
+function renderVarExpPropTabs(){
+  const tabsEl=document.getElementById('varExpPropTabs');
+  if(!tabsEl)return;
+  const arr=Object.values(properties).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!activeVarExpProp&&arr.length) activeVarExpProp=arr[0].name;
+  tabsEl.innerHTML=arr.map(p=>{
+    const count=Object.values(varExps).filter(ve=>ve.property===p.name).length;
+    const isActive=activeVarExpProp===p.name;
+    return`<button onclick="setVarExpProp('${p.name}')" style="padding:5px 12px;border-radius:6px;border:1px solid ${isActive?'rgba(59,130,246,0.5)':' var(--border)'};background:${isActive?'var(--blue-dim)':'transparent'};color:${isActive?'var(--blue3)':'var(--white4)'};font-size:11px;font-weight:${isActive?'700':'400'};cursor:pointer;display:flex;align-items:center;gap:5px;">
+      🏠 ${p.name}${count>0?`<span style="background:rgba(59,130,246,0.2);color:var(--blue3);border-radius:10px;padding:0 5px;font-size:9px;font-family:DM Mono,monospace;">${count}</span>`:''}
+    </button>`;
+  }).join('');
+  renderVarExpLog();
+}
+
+window.setVarExpProp=function(name){
+  activeVarExpProp=name;
+  // sync the dropdown too
+  const vp=document.getElementById('varExpProp');
+  if(vp) vp.value=name;
+  renderVarExpPropTabs();
+};
+
+function renderVarExpLog(){
+  const el=document.getElementById('varExpLog');
+  if(!el)return;
+  const prop=activeVarExpProp||document.getElementById('varExpProp')?.value;
+  const arr=Object.entries(varExps)
+    .filter(([,ve])=>!prop||ve.property===prop)
+    .sort((a,b)=>b[1].date?.localeCompare(a[1].date||'')||0);
+  if(!arr.length){
+    el.innerHTML=`<div class="empty"><div class="empty-text">No variable expenses logged for ${prop||'this property'} yet.</div></div>`;
+    return;
+  }
+  const total=arr.reduce((s,[,ve])=>s+(ve.amount||0),0);
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 10px;background:var(--black3);border-radius:6px;">
+    <span style="font-family:DM Mono,monospace;font-size:10px;color:var(--white4);">${arr.length} expense${arr.length>1?'s':''} for ${prop}</span>
+    <span style="font-family:DM Mono,monospace;font-size:12px;color:var(--red2);font-weight:700;">-$${m(total)} total</span>
+  </div>`+arr.map(([id,ve])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <div style="flex:1;">
+        <div style="font-weight:600;">${ve.desc}</div>
+        <div style="font-size:10px;color:var(--white4);font-family:DM Mono,monospace;">${ve.cat} · ${ve.date||'—'}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:DM Mono,monospace;color:var(--red2);">-$${m(ve.amount||0)}</span>
+        <button class="btn btn-sm btn-danger" onclick="deleteStandaloneVarExp('${id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+window.showTab=function(tab){
+  ['monthly','properties','flips','debt','history','settings'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'block':'none');
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['monthly','properties','flips','debt','history','settings'][i]===tab));
+  if(tab==='history')renderHistory();
+  if(tab==='debt'){renderDebt();renderMortgageInputs();renderCardList();}
+  if(tab==='flips')renderFlips();
+  if(tab==='monthly'){renderVarExpPropTabs();}
+};
+
+function fd(d){if(!d)return'—';const[y,m,day]=d.split('-');return`${m}/${day}/${y.slice(2)}`;}
+function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+window.renderEntries=renderEntries;
+window.renderAll=renderAll;
+window.autoFillFixed=autoFillFixed;
+window.calcEntryNights=calcEntryNights;
+window.updateEntryCalcs=updateEntryCalcs;
+window.renderVarExpLog=renderVarExpLog;
+window.renderVarExpPropTabs=renderVarExpPropTabs;
+
+
+// ── SEED DEBT DATA ──
+function seedDebtIfEmpty(){
+  // Mortgages
+  onValue(ref(db,'ffinv/mortgages'),snap=>{
+    if(snap.val()) return; // already seeded
+    const mortData=[
+      {property:'Marywood',balance:468360.07,payment:4994.39,arv:1700000},
+      {property:'Scottsdale',balance:1161764.43,payment:7500,arv:2000000},
+      {property:'Phoenix Loft',balance:414362.83,payment:3237.81,arv:420000},
+      {property:'Kirkwood',balance:94748.73,payment:713.91,arv:150000},
+      {property:'Sunset',balance:80612.64,payment:607.40,arv:120000},
+      {property:'Anson',balance:112000,payment:771.56,arv:112000},
+      {property:'Meadow Valley',balance:80000,payment:1000,arv:300000},
+      {property:'Monticello',balance:290000,payment:1200,arv:580000},
+    ];
+    mortData.forEach(m=>{
+      const id=`mort_${m.property.replace(/\s/g,'_')}`;
+      fbSet(`ffinv/mortgages/${id}`,{id,...m});
+    });
+  },{onlyOnce:true});
+
+  // Credit cards
+  onValue(ref(db,'ffinv/cards'),snap=>{
+    if(snap.val()) return;
+    const cardData=[
+      {name:'Chase Business Ink',limit:20000,balance:24228.24},
+      {name:'Amex Cash',limit:10000,balance:178.19},
+      {name:'Lowes Card',limit:5000,balance:0},
+    ];
+    cardData.forEach(cd=>{
+      const id=`card_${cd.name.replace(/\s/g,'_')}`;
+      fbSet(`ffinv/cards/${id}`,{id,...cd});
+    });
+  },{onlyOnce:true});
+}
+
+// ── INIT ──
+document.getElementById('monthLabel').textContent=monthLabel();
+const now=new Date();
+const vd=document.getElementById('varExpDate');if(vd)vd.valueAsDate=new Date();
+setSyncDot('syncing');
+setupListeners();
+seedDebtIfEmpty();
+setTimeout(()=>{document.getElementById('loadingScreen').style.display='none';setSyncDot('online');},3000);
+</script>
+</body>
+</html>
